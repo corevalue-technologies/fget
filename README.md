@@ -6,7 +6,7 @@ Command to help download faster on command line interface :)
 
 you may add these in your path variable via your **~/.bash_profile** file (curl should be installed)
 
-## Usage of bbye
+## Usage of fget
 
 `$ ./fget <link>`
 
