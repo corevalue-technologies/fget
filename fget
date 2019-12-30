@@ -1,0 +1,53 @@
+#!/bin/bash
+
+INPUTURL=$1
+SPLITS=4
+OUTPUTFILE=`basename $INPUTURL`
+MAXSIZE=`curl -I $INPUTURL | grep "^Content-Length:" | cut -d' ' -f2`
+MAXSIZE=${MAXSIZE//$'\r'}
+MULTIPLEPART="on"
+
+if [ ! -z "$MAXSIZE" ] && [ ! -z "$SPLITS" ] ; then
+   echo "$OUTPUTFILE file will be downloaded in $SPLITS parts"
+   echo "Press ^C and enter to continue on shell file will be downloaded in background"
+
+   trap "{ force_exit; }" EXIT
+   trap "{ kill $(jobs -pr) && cleanup; }" SIGINT SIGTERM
+
+   SPLIT_SIZE=$((MAXSIZE/ SPLITS))
+   PIDLIST=""
+   for (( c=0; c<=SPLITS-2; c++ ))
+   do
+       startbyte=$(( c * SPLIT_SIZE ))
+       endbyte=$(( startbyte + SPLIT_SIZE - 1 ))
+       curl --range $startbyte-$endbyte -o $OUTPUTFILE.part$c $INPUTURL &
+       PIDLIST="$PIDLIST $!"
+   done
+
+   startbyte=$(( (SPLITS-1) * SPLIT_SIZE ))
+   curl --range $startbyte-$endbyte -o $OUTPUTFILE.part$c $INPUTURL &
+   PIDLIST="$PIDLIST $!"
+   wait $PIDLIST
+   cat $OUTPUTFILE.part* > $OUTPUTFILE
+else
+   echo "$OUTPUTFILE file will be downloaded in one part"
+   echo "Press ^C & enter to continue on shell file will be downloaded in background"
+   curl -o $OUTPUTFILE $INPUTURL &
+fi
+
+function force_exit()  {
+    for f in $OUTPUTFILE.part*;
+    do
+        if [ -e $f ] ; then
+            rm $f
+        fi
+    done
+}
+
+function cleanup()  {
+    force_exit
+    if [ -e $OUTPUTFILE ] ; then
+        rm $OUTPUTFILE
+    fi
+    exit 1
+}
